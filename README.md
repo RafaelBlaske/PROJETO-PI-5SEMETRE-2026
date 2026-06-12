@@ -53,7 +53,8 @@ Pré-requisitos
 
 Flutter SDK instalado
 Node.js 18+ instalado
-
+Gerar chave API do Groq
+Coloque ela em ai_service_dart dentro da pasta lib (lá terá o espaço certo para colocar)
 
 Backend
 bashcd agix_backend
