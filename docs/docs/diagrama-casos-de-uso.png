@@ -1,0 +1,30 @@
+# Diagrama de Casos de Uso
+
+```mermaid
+flowchart LR
+
+A[Usuário da Agência]
+
+A --> UC1[Criar Conta]
+A --> UC2[Realizar Login]
+A --> UC3[Gerar Ideia de Conteúdo]
+A --> UC4[Gerar Roteiro de Vídeo]
+A --> UC5[Gerar Copy Publicitária]
+A --> UC6[Salvar Conteúdo Gerado]
+A --> UC7[Visualizar Histórico]
+
+Admin[Administrador]
+
+Admin --> UC8[Gerenciar Usuários]
+
+subgraph AGIX Creator AI
+UC1
+UC2
+UC3
+UC4
+UC5
+UC6
+UC7
+UC8
+end
+```
