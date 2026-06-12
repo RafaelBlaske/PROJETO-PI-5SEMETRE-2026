@@ -1,0 +1,12 @@
+{
+    "name": "AGIX Creator AI",
+    "short_name": "AGIX",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#1a1a2e",
+    "theme_color": "#1a1a2e",
+    "description": "Gerador de conteúdo inteligente para agências",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": []
+}

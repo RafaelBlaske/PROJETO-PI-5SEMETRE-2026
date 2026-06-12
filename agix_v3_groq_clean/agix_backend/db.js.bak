@@ -1,0 +1,183 @@
+const Database = require('better-sqlite3');
+const fs = require('fs');
+const path = require('path');
+
+const DB_PATH = path.join(__dirname, 'agix.db');
+const SQL_PATH = path.join(__dirname, 'database.sql');
+
+let db;
+
+function getDb() {
+  if (!db) {
+    db = new Database(DB_PATH);
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+  }
+  return db;
+}
+
+function initDatabase() {
+  const database = getDb();
+
+  // Verifica se o banco já foi criado (tabela users existe)
+  const tableExists = database.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+  ).get();
+
+  if (!tableExists) {
+    console.log('📦 Criando banco de dados e inserindo dados iniciais...');
+    const sql = fs.readFileSync(SQL_PATH, 'utf-8');
+
+    // Executa todas as instruções SQL do arquivo
+    database.exec(sql);
+    console.log('✅ Banco de dados criado com sucesso!');
+  } else {
+    console.log('✅ Banco de dados já existe, conectando...');
+  }
+
+  return database;
+}
+
+// =====================================================
+// FUNÇÕES DE ACESSO AO BANCO
+// =====================================================
+
+// USUÁRIOS
+function getAllUsers() {
+  return getDb().prepare('SELECT * FROM users ORDER BY created_at DESC').all();
+}
+
+function getUserById(id) {
+  return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id);
+}
+
+function getUserByEmail(email) {
+  return getDb().prepare('SELECT * FROM users WHERE email = ?').get(email);
+}
+
+function createUser({ name, email, agency_name, plan = 'free' }) {
+  const stmt = getDb().prepare(
+    'INSERT INTO users (name, email, agency_name, plan) VALUES (?, ?, ?, ?)'
+  );
+  const result = stmt.run(name, email, agency_name, plan);
+  return getUserById(result.lastInsertRowid);
+}
+
+// CONTEÚDOS
+function getContentsByUser(userId, limit = 50) {
+  return getDb().prepare(
+    'SELECT * FROM contents WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
+  ).all(userId, limit);
+}
+
+function getFavoritesByUser(userId) {
+  return getDb().prepare(
+    'SELECT * FROM contents WHERE user_id = ? AND is_favorite = 1 ORDER BY created_at DESC'
+  ).all(userId);
+}
+
+function saveContent({ id, user_id, type, title, content, form_data }) {
+  const stmt = getDb().prepare(
+    'INSERT OR REPLACE INTO contents (id, user_id, type, title, content, form_data) VALUES (?, ?, ?, ?, ?, ?)'
+  );
+  stmt.run(id, user_id, type, title, content, JSON.stringify(form_data));
+  return getContentById(id);
+}
+
+function getContentById(id) {
+  return getDb().prepare('SELECT * FROM contents WHERE id = ?').get(id);
+}
+
+function toggleFavorite(id) {
+  getDb().prepare(
+    'UPDATE contents SET is_favorite = CASE WHEN is_favorite = 1 THEN 0 ELSE 1 END WHERE id = ?'
+  ).run(id);
+  return getContentById(id);
+}
+
+function deleteContent(id) {
+  return getDb().prepare('DELETE FROM contents WHERE id = ?').run(id);
+}
+
+// CLIENTES
+function getClientsByUser(userId) {
+  return getDb().prepare(
+    'SELECT * FROM clients WHERE user_id = ? ORDER BY name ASC'
+  ).all(userId);
+}
+
+function createClient({ user_id, name, niche, target_audience, notes }) {
+  const stmt = getDb().prepare(
+    'INSERT INTO clients (user_id, name, niche, target_audience, notes) VALUES (?, ?, ?, ?, ?)'
+  );
+  const result = stmt.run(user_id, name, niche, target_audience, notes);
+  return getDb().prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid);
+}
+
+// TEMPLATES
+function getTemplatesByUser(userId) {
+  return getDb().prepare(
+    'SELECT * FROM templates WHERE user_id = ? ORDER BY created_at DESC'
+  ).all(userId);
+}
+
+function saveTemplate({ user_id, name, type, form_data }) {
+  const stmt = getDb().prepare(
+    'INSERT INTO templates (user_id, name, type, form_data) VALUES (?, ?, ?, ?)'
+  );
+  const result = stmt.run(user_id, name, type, JSON.stringify(form_data));
+  return getDb().prepare('SELECT * FROM templates WHERE id = ?').get(result.lastInsertRowid);
+}
+
+// MÉTRICAS
+function logUsage({ user_id, content_type, tokens_used }) {
+  getDb().prepare(
+    'INSERT INTO ai_usage (user_id, content_type, tokens_used) VALUES (?, ?, ?)'
+  ).run(user_id, content_type, tokens_used || 0);
+}
+
+function getUsageByUser(userId) {
+  return getDb().prepare(
+    'SELECT content_type, COUNT(*) as total, SUM(tokens_used) as tokens FROM ai_usage WHERE user_id = ? GROUP BY content_type'
+  ).all(userId);
+}
+
+function getGeneralStats() {
+  const db = getDb();
+  return {
+    totalUsers: db.prepare('SELECT COUNT(*) as count FROM users').get().count,
+    totalContents: db.prepare('SELECT COUNT(*) as count FROM contents').get().count,
+    totalClients: db.prepare('SELECT COUNT(*) as count FROM clients').get().count,
+    totalFavorites: db.prepare('SELECT COUNT(*) as count FROM contents WHERE is_favorite = 1').get().count,
+    contentByType: db.prepare(
+      'SELECT type, COUNT(*) as count FROM contents GROUP BY type ORDER BY count DESC'
+    ).all(),
+  };
+}
+
+module.exports = {
+  initDatabase,
+  getDb,
+  // Users
+  getAllUsers,
+  getUserById,
+  getUserByEmail,
+  createUser,
+  // Contents
+  getContentsByUser,
+  getFavoritesByUser,
+  saveContent,
+  getContentById,
+  toggleFavorite,
+  deleteContent,
+  // Clients
+  getClientsByUser,
+  createClient,
+  // Templates
+  getTemplatesByUser,
+  saveTemplate,
+  // Usage
+  logUsage,
+  getUsageByUser,
+  getGeneralStats,
+};
